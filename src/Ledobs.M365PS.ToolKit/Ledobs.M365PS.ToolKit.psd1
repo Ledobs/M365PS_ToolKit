@@ -11,7 +11,10 @@
     FunctionsToExport = @(
         'Assert-RequiredScopes',
         'Connect-ToolkitAuth',
+        'Export-ToolkitReport',
+        'Get-ToolkitDirectoryAudit',
         'Get-ToolkitConfig',
+        'Get-ToolkitSignIn',
         'Get-TenantBaseline',
         'Initialize-ToolkitLogging',
         'Write-ToolkitLog'

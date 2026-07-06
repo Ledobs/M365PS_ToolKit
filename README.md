@@ -13,8 +13,11 @@ Voir : `plan-m365AdminToolkit.prompt.md`
 ## Fonctions disponibles
 
 - `Connect-ToolkitAuth` : connexion Microsoft Graph en interactif ou app-only.
+- `Export-ToolkitReport` : export CSV ou JSON des jeux de données collectés.
+- `Get-ToolkitDirectoryAudit` : lecture des événements `directoryAudits` Microsoft Entra ID.
 - `Assert-RequiredScopes` : validation des scopes Graph attendus.
 - `Get-ToolkitConfig` : chargement de la configuration toolkit.
+- `Get-ToolkitSignIn` : lecture des événements `signIns` Microsoft Entra ID.
 - `Get-TenantBaseline` : lecture des paramètres de base du tenant à partir de la config et du contexte Graph.
 - `Initialize-ToolkitLogging` : initialisation du dossier et du fichier de log.
 - `Write-ToolkitLog` : journalisation JSONL structurée.
@@ -32,6 +35,15 @@ Write-ToolkitLog -Level Info -Message 'Toolkit initialized' -Data @{
 ```
 
 Par défaut, `Get-ToolkitConfig` charge `config\Toolkit.Config.local.psd1` si le fichier existe, sinon bascule sur `config\Toolkit.Config.example.psd1`.
+
+## Exemple reporting
+
+```powershell
+Connect-ToolkitAuth -Scopes 'AuditLog.Read.All', 'Directory.Read.All'
+
+$signIns = Get-ToolkitSignIn -From (Get-Date).AddDays(-1) -To (Get-Date)
+$signIns | Export-ToolkitReport -Path '.\out\signins.csv' -Format Csv
+```
 
 Inspiration:
 - https://github.com/microsoft/Microsoft365DSC

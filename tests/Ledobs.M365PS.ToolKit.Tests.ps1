@@ -36,3 +36,32 @@ Describe 'Get-TenantBaseline' {
         ($baseline.Checks | Where-Object Setting -eq 'DefaultFormat').DesiredValue | Should Be 'Csv'
     }
 }
+
+Describe 'Export-ToolkitReport' {
+    It 'exports objects to CSV' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\report.csv'
+        [pscustomobject]@{ Name = 'Alice'; Status = 'Success' } |
+            Export-ToolkitReport -Path $path -Format Csv | Out-Null
+
+        Test-Path -LiteralPath $path | Should Be $true
+        (Import-Csv -LiteralPath $path)[0].Name | Should Be 'Alice'
+    }
+
+    It 'exports objects to JSON' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\report.json'
+        [pscustomobject]@{ Name = 'Bob'; Status = 'Blocked' } |
+            Export-ToolkitReport -Path $path -Format Json | Out-Null
+
+        Test-Path -LiteralPath $path | Should Be $true
+        ((Get-Content -LiteralPath $path -Raw) | ConvertFrom-Json)[0].Status | Should Be 'Blocked'
+    }
+}
+
+Describe 'Module surface' {
+    It 'exports reporting functions' {
+        $names = (Get-Command -Module Ledobs.M365PS.ToolKit).Name
+        ($names -contains 'Get-ToolkitDirectoryAudit') | Should Be $true
+        ($names -contains 'Get-ToolkitSignIn') | Should Be $true
+        ($names -contains 'Export-ToolkitReport') | Should Be $true
+    }
+}
