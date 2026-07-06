@@ -24,25 +24,60 @@ Voir : `plan-m365AdminToolkit.prompt.md`
 
 ## Démarrage rapide
 
+Prérequis :
+- PowerShell 7+
+- module `Microsoft.Graph.Authentication`
+- pour `Get-ToolkitDirectoryAudit` et `Get-ToolkitSignIn` : droits Microsoft Graph `AuditLog.Read.All` et `Directory.Read.All`
+
+1. Depuis la racine du repo, créez un fichier `config\Toolkit.Config.local.psd1` à partir de `config\Toolkit.Config.example.psd1`.
+2. Renseignez au minimum `Tenant.TenantId` et `Tenant.Domain`.
+3. Importez le module.
+4. Initialisez la configuration et les logs.
+
 ```powershell
+# Depuis la racine du dépôt
 Import-Module .\src\Ledobs.M365PS.ToolKit\Ledobs.M365PS.ToolKit.psd1 -Force
 
 $config = Get-ToolkitConfig
 $logState = Initialize-ToolkitLogging
+
 Write-ToolkitLog -Level Info -Message 'Toolkit initialized' -Data @{
     TenantId = $config.Tenant.TenantId
+    LogFile  = $logState.LogFile
 }
 ```
 
 Par défaut, `Get-ToolkitConfig` charge `config\Toolkit.Config.local.psd1` si le fichier existe, sinon bascule sur `config\Toolkit.Config.example.psd1`.
 
-## Exemple reporting
+Exemple de lecture de la baseline locale :
+
+```powershell
+$baseline = Get-TenantBaseline
+$baseline.Checks | Format-Table -AutoSize
+```
+
+Exemple de connexion Microsoft Graph en mode interactif :
 
 ```powershell
 Connect-ToolkitAuth -Scopes 'AuditLog.Read.All', 'Directory.Read.All'
+```
+
+Exemple d’export des connexions des 24 dernières heures :
+
+```powershell
+$outputPath = '.\out\signins-last-24h.csv'
 
 $signIns = Get-ToolkitSignIn -From (Get-Date).AddDays(-1) -To (Get-Date)
-$signIns | Export-ToolkitReport -Path '.\out\signins.csv' -Format Csv
+$signIns | Export-ToolkitReport -Path $outputPath -Format Csv
+```
+
+Exemple d’export des audits Entra ID sur 7 jours :
+
+```powershell
+$auditPath = '.\out\directory-audits-last-7d.json'
+
+$audits = Get-ToolkitDirectoryAudit -From (Get-Date).AddDays(-7) -To (Get-Date)
+$audits | Export-ToolkitReport -Path $auditPath -Format Json
 ```
 
 Inspiration:
