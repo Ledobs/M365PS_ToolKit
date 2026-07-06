@@ -1,0 +1,10 @@
+*.log
+*.tmp
+*.bak
+
+.vscode/
+
+config/Toolkit.Config.local.psd1
+out/
+logs/
+tests/artifacts/
