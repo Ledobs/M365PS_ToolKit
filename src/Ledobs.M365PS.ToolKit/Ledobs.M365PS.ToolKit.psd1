@@ -17,6 +17,7 @@
         'Get-ToolkitSignIn',
         'Get-TenantBaseline',
         'Initialize-ToolkitLogging',
+        'New-AuditReport',
         'Write-ToolkitLog'
     )
 

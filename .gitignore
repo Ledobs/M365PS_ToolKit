@@ -5,6 +5,7 @@
 .vscode/
 
 config/Toolkit.Config.local.psd1
-out/
+/out/
 logs/
 tests/artifacts/
+_obsidian-project/.obsidian/

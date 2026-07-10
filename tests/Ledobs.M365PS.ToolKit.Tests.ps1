@@ -63,5 +63,48 @@ Describe 'Module surface' {
         ($names -contains 'Get-ToolkitDirectoryAudit') | Should Be $true
         ($names -contains 'Get-ToolkitSignIn') | Should Be $true
         ($names -contains 'Export-ToolkitReport') | Should Be $true
+        ($names -contains 'New-AuditReport') | Should Be $true
+    }
+}
+
+Describe 'New-AuditReport' {
+    It 'builds a combined report and exports details and summary' {
+        Mock Get-ToolkitSignIn {
+            @(
+                [pscustomobject]@{
+                    CreatedDateTime = '2026-07-01T10:00:00Z'
+                    UserDisplayName = 'Alice'
+                    UserPrincipalName = 'alice@contoso.com'
+                    AppDisplayName = 'Microsoft 365'
+                    IPAddress = '10.0.0.1'
+                    ResourceDisplayName = 'SharePoint Online'
+                    StatusCode = 0
+                    ConditionalAccessStatus = 'success'
+                    Id = 'signin-1'
+                }
+            )
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Get-ToolkitDirectoryAudit {
+            @(
+                [pscustomobject]@{
+                    ActivityDateTime = '2026-07-01T11:00:00Z'
+                    ActivityDisplayName = 'Add member to group'
+                    Category = 'GroupManagement'
+                    Result = 'success'
+                    InitiatedBy = 'admin@contoso.com'
+                    TargetResources = 'M365-Admins'
+                    Id = 'audit-1'
+                }
+            )
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\weekly-audit'
+        $report = New-AuditReport -OutputPath $path -Format Csv
+
+        $report.RecordCount | Should Be 2
+        $report.Summary.Count | Should Be 2
+        (Test-Path -LiteralPath $report.Output.DetailsPath) | Should Be $true
+        (Test-Path -LiteralPath $report.Output.SummaryPath) | Should Be $true
     }
 }

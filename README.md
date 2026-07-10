@@ -8,7 +8,7 @@ Voir : `plan-m365AdminToolkit.prompt.md`
 
 - `src/Ledobs.M365PS.ToolKit` : module PowerShell principal.
 - `config/Toolkit.Config.example.psd1` : exemple de configuration.
-- `tests/` : base de tests Pester.
+- `tests/` : suite Pester minimale du module.
 
 ## Fonctions disponibles
 
@@ -20,6 +20,7 @@ Voir : `plan-m365AdminToolkit.prompt.md`
 - `Get-ToolkitSignIn` : lecture des événements `signIns` Microsoft Entra ID.
 - `Get-TenantBaseline` : lecture des paramètres de base du tenant à partir de la config et du contexte Graph.
 - `Initialize-ToolkitLogging` : initialisation du dossier et du fichier de log.
+- `New-AuditReport` : rapport combiné `signIns` + `directoryAudits`, avec synthèse et export.
 - `Write-ToolkitLog` : journalisation JSONL structurée.
 
 ## Démarrage rapide
@@ -78,6 +79,18 @@ $auditPath = '.\out\directory-audits-last-7d.json'
 
 $audits = Get-ToolkitDirectoryAudit -From (Get-Date).AddDays(-7) -To (Get-Date)
 $audits | Export-ToolkitReport -Path $auditPath -Format Json
+```
+
+Exemple de rapport d’audit combiné :
+
+```powershell
+$report = New-AuditReport `
+    -From (Get-Date).AddDays(-7) `
+    -To (Get-Date) `
+    -OutputPath '.\out\weekly-audit' `
+    -Format Csv
+
+$report.Summary | Format-Table -AutoSize
 ```
 
 Inspiration:
