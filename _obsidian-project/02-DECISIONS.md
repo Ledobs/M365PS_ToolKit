@@ -98,3 +98,58 @@ Décision:
 Conséquence:
 
 - Le repo garde la mémoire projet sans embarquer la configuration UI locale d'Obsidian.
+
+## 2026-07-10 - V1 agents tiers en double forme
+
+Contexte:
+
+- Le besoin porte sur le blocage des agents tiers M365 à partir d'un export CSV admin.
+- L'usage visé couvre à la fois l'intégration durable dans le toolkit et un mode script simple pour un admin.
+
+Décision:
+
+- Implémenter une cmdlet module `Block-ToolkitThirdPartyAgent`.
+- Ajouter un script wrapper `scripts/Block-ThirdPartyAgentsFromAdminExport.ps1`.
+
+Conséquence:
+
+- La logique métier reste centralisée dans le module.
+- Le script wrapper reste léger et sans duplication de comportement.
+
+## 2026-07-10 - V1 agents tiers basée sur CSV avec vérification Graph
+
+Contexte:
+
+- Le centre d'administration expose un export CSV contenant `Title ID`, `Status` et `Publisher Type`.
+- Le besoin utilisateur veut reproduire le workflow UI, mais avec une validation côté Graph avant action.
+
+Décision:
+
+- La sélection des cibles part du CSV.
+- Le blocage ne se fait qu'après une vérification Graph du package par `Title ID`.
+- Le périmètre v1 reste limité au blocage, pas au déblocage.
+
+Conséquence:
+
+- Le CSV reste l'entrée opératoire principale.
+- Une session Graph avec `CopilotPackages.ReadWrite.All` est requise pour le mode complet.
+- Le déblocage sera un chantier séparé.
+
+## 2026-07-10 - Les types Graph tiers supportés sont `thirdParty` et `external`
+
+Contexte:
+
+- Le test `WhatIf` avec vérification Graph active a été exécuté sur des agents tiers réels du tenant.
+- Les packages testés ont renvoyé `GraphType = thirdParty` et non `external`.
+- La v1 actuelle saute donc à tort les candidats avec `SkippedNotExternal`.
+
+Décision:
+
+- Considérer `thirdParty` comme la valeur observée de référence dans le tenant cible.
+- Accepter aussi `external` en compatibilité défensive pour d'autres tenants ou variations de service.
+
+Conséquence:
+
+- La logique de filtrage Graph de `Block-ToolkitThirdPartyAgent` doit accepter les 2 valeurs.
+- Les tests doivent couvrir explicitement `thirdParty`, `external` et un type hors périmètre.
+- Les plans et validations suivants doivent s'appuyer sur cette réalité observée, pas sur l'hypothèse initiale `external` seule.

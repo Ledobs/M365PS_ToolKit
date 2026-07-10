@@ -11,11 +11,14 @@ Priorités indicatives. Garder les items actionnables et déplacer les détails 
 
 ## P1 - Toolkit PowerShell
 
-- Régulariser l'index Git autour de `New-AuditReport.ps1`, du manifeste module et des tests restaurés.
-- Committer la tranche `New-AuditReport` si le diff final reste cohérent.
-- Étendre ensuite le reporting: HTML/Markdown, filtrage plus fin, ou synthèse spécialisée M365/Entra/SharePoint.
+- Étendre le toolkit avec d'autres opérations agents si besoin: déblocage, rapports de synthèse, relances ciblées.
 
-## P2 - Documentation et usage
+## P2 - Reporting et gouvernance
+
+- Étendre `New-AuditReport` vers HTML/Markdown si utile.
+- Ajouter des synthèses spécialisées M365/Entra/SharePoint.
+
+## P3 - Documentation et usage
 
 - Garder le README centré sur l'utilisateur final du toolkit.
 - Garder `_obsidian-project/` centré sur la reprise de travail et les décisions internes.
@@ -26,3 +29,6 @@ Priorités indicatives. Garder les items actionnables et déplacer les détails 
 - 2026-07-10: Planifier la mémoire de projet Obsidian dans le repo.
 - 2026-07-10: Corriger les notes de suivi pour utiliser un français accentué.
 - 2026-07-10: Clarifier que les tests restent versionnés et revalider la suite Pester locale.
+- 2026-07-10: Implémenter la v1 du blocage des agents tiers depuis CSV avec wrapper admin et tests.
+- 2026-07-10: Corriger `Block-ToolkitThirdPartyAgent` pour accepter `GraphType = thirdParty` et `external`.
+- 2026-07-10: Valider en conditions réelles la campagne de blocage des agents tiers via CSV admin + Graph.

@@ -31,22 +31,39 @@ Ne pas supposer que ces changements viennent de la session courante.
 
 ## Objectif actif
 
-Stabiliser l'état Git et la base qualité du module avant d'élargir les fonctionnalités, puis poursuivre le développement du reporting et des cmdlets d'administration M365.
+Étendre le toolkit avec des cmdlets d'administration M365 orientées agents, en commençant par le blocage des agents tiers depuis un export CSV du centre d'administration.
 
 ## Dernier delta
 
 2026-07-10:
 
-- Relecture de la mémoire Obsidian et clarification de l'état Git réel.
-- Vérification que `New-AuditReport.ps1` est cohérent avec le manifeste et le README.
-- Restauration de la stratégie voulue pour les tests: `tests/` reste versionné; seuls `tests/artifacts/` sont ignorés.
-- Validation locale du module: manifeste OK, import OK, Pester OK (`Passed: 7`).
+- Ajout de `Block-ToolkitThirdPartyAgent` dans le module.
+- Ajout des helpers privés pour validation CSV, lookup package Graph, retry Graph et normalisation des résultats.
+- Ajout du wrapper `scripts/Block-ThirdPartyAgentsFromAdminExport.ps1`.
+- Mise à jour du README avec la section “Gestion des agents tiers”.
+- Validation locale complète: manifeste OK, import OK, Pester OK (`Passed: 14`).
+- Validation manuelle en `WhatIf` sur le CSV réel, sans vérification Graph.
+- Exécution réelle du protocole de test `WhatIf` avec vérification Graph active sur un mini CSV de 3 lignes.
+- Constat critique: Graph renvoie `GraphType = thirdParty` sur les agents testés, alors que la cmdlet v1 attend `external`.
+- Correctif appliqué dans `Block-ToolkitThirdPartyAgent`: accepter `thirdParty` et `external`.
+- Tests Pester mis à jour pour couvrir `thirdParty`, `external` et un type refusé; validation locale OK (`Passed: 16`).
+- Limite de session constatée: mes shells d'exécution n'héritent pas d'un contexte `Get-MgContext`, donc le re-test réel tenant doit repartir d'un shell PowerShell déjà connecté à Graph.
+- Confirmation utilisateur: le test réel ciblé fonctionne dans un shell utilisateur connecté.
+- Tentative de lancement du CSV complet depuis mon shell automatisé impossible tant que `Get-MgContext` y reste absent.
+- Nouveau CSV fourni: `C:\Users\FrançoisBreton\Downloads\Agents_2026-07-10_19_19_35.csv`.
+- Constat important: les 108 lignes de ce CSV sont toutes en `Status = Not available`; avec le filtre par défaut `Available`, le wrapper ne traitera rien.
+- Une copie filtrée sans HubSpot a été générée: `C:\Users\FrançoisBreton\Downloads\Agents_2026-07-10_19_19_35_no-hubspot.csv`.
+- Résultat réel du lot sans HubSpot: `81 Blocked`, `23 GraphLookupFailed`, `3 Failed`.
+- Les `27` agents encore visibles correspondent exactement à `HubSpot` exclu + `26` échecs Graph côté service (`FailedDependency`).
+- Un CSV de reprise ciblé a été préparé: `C:\Users\FrançoisBreton\Downloads\Agents_2026-07-10_20_01_52_retry-no-hubspot.csv`.
+- Confirmation finale utilisateur: la reprise a abouti, les agents restants sont maintenant bloqués.
+- Le script de blocage des agents tiers est validé en conditions réelles.
 
 ## Prochain pas exact
 
-1. Régulariser l'index Git en réintégrant `tests/` comme contenu suivi.
-2. Décider si la tranche `New-AuditReport` doit être commitée telle quelle avec la correction `.gitignore`/README.
-3. Après stabilisation Git, attaquer la prochaine tranche technique: amélioration de `New-AuditReport` ou première cmdlet de baseline réelle.
+1. Committer et pousser les changements du toolkit et de la mémoire Obsidian.
+2. Au prochain chantier, reprendre depuis `03-BACKLOG.md`.
+3. Garder le script actuel comme base validée pour les futures opérations agents.
 
 ## Contexte à charger
 

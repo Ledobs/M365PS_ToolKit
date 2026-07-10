@@ -10,6 +10,7 @@
 
     FunctionsToExport = @(
         'Assert-RequiredScopes',
+        'Block-ToolkitThirdPartyAgent',
         'Connect-ToolkitAuth',
         'Export-ToolkitReport',
         'Get-ToolkitDirectoryAudit',

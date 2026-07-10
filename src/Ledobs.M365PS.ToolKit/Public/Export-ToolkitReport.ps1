@@ -30,10 +30,10 @@ function Export-ToolkitReport {
 
         switch ($Format) {
             'Csv' {
-                $buffer | Export-Csv -LiteralPath $Path -NoTypeInformation -Encoding UTF8
+                $buffer | Export-Csv -LiteralPath $Path -NoTypeInformation -Encoding UTF8 -WhatIf:$false
             }
             'Json' {
-                $buffer | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Path -Encoding UTF8
+                $buffer | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Path -Encoding UTF8 -WhatIf:$false
             }
         }
 

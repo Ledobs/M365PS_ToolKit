@@ -12,6 +12,7 @@ Voir : `plan-m365AdminToolkit.prompt.md`
 
 ## Fonctions disponibles
 
+- `Block-ToolkitThirdPartyAgent` : blocage des agents tiers depuis un CSV exporté du centre d'administration M365.
 - `Connect-ToolkitAuth` : connexion Microsoft Graph en interactif ou app-only.
 - `Export-ToolkitReport` : export CSV ou JSON des jeux de données collectés.
 - `Get-ToolkitDirectoryAudit` : lecture des événements `directoryAudits` Microsoft Entra ID.
@@ -91,6 +92,55 @@ $report = New-AuditReport `
     -Format Csv
 
 $report.Summary | Format-Table -AutoSize
+```
+
+## Gestion des agents tiers
+
+Prérequis :
+- PowerShell 7+
+- module `Microsoft.Graph.Authentication`
+- permission Microsoft Graph `CopilotPackages.ReadWrite.All`
+- accès au Package Management API Microsoft Agent 365
+
+Limites connues :
+- la sélection dépend du `Title ID` présent dans l'export CSV du centre d'administration
+- l'action de blocage utilise un endpoint `/beta`
+- l'état UI et l'état Graph peuvent différer temporairement selon la propagation côté service
+
+Format CSV attendu :
+- `Name`
+- `Status`
+- `Publisher Type`
+- `Title ID`
+
+Exemple `WhatIf` depuis le module :
+
+```powershell
+Connect-ToolkitAuth -Scopes 'CopilotPackages.ReadWrite.All'
+
+Block-ToolkitThirdPartyAgent `
+  -CsvPath 'C:\Exports\Agents_2026-07-10_15_00_45.csv' `
+  -OutputPath '.\out\third-party-block-results.csv' `
+  -WhatIf
+```
+
+Exemple d'exécution réelle :
+
+```powershell
+Connect-ToolkitAuth -Scopes 'CopilotPackages.ReadWrite.All'
+
+Block-ToolkitThirdPartyAgent `
+  -CsvPath 'C:\Exports\Agents_2026-07-10_15_00_45.csv' `
+  -OutputPath '.\out\third-party-block-results.csv'
+```
+
+Exemple via script wrapper :
+
+```powershell
+.\scripts\Block-ThirdPartyAgentsFromAdminExport.ps1 `
+  -CsvPath 'C:\Exports\Agents_2026-07-10_15_00_45.csv' `
+  -OutputPath '.\out\third-party-block-results.csv' `
+  -WhatIf
 ```
 
 Inspiration:

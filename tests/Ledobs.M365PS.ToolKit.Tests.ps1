@@ -60,6 +60,7 @@ Describe 'Export-ToolkitReport' {
 Describe 'Module surface' {
     It 'exports reporting functions' {
         $names = (Get-Command -Module Ledobs.M365PS.ToolKit).Name
+        ($names -contains 'Block-ToolkitThirdPartyAgent') | Should Be $true
         ($names -contains 'Get-ToolkitDirectoryAudit') | Should Be $true
         ($names -contains 'Get-ToolkitSignIn') | Should Be $true
         ($names -contains 'Export-ToolkitReport') | Should Be $true
@@ -106,5 +107,173 @@ Describe 'New-AuditReport' {
         $report.Summary.Count | Should Be 2
         (Test-Path -LiteralPath $report.Output.DetailsPath) | Should Be $true
         (Test-Path -LiteralPath $report.Output.SummaryPath) | Should Be $true
+    }
+}
+
+Describe 'Block-ToolkitThirdPartyAgent' {
+    It 'rejects CSV files with missing required columns' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\invalid-agents.csv'
+        @(
+            [pscustomobject]@{
+                Name = 'Agent A'
+                Status = 'Available'
+            }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        $errorMessage = $null
+
+        try {
+            Block-ToolkitThirdPartyAgent -CsvPath $path -VerifyWithGraph:$false -ErrorAction Stop | Out-Null
+        }
+        catch {
+            $errorMessage = $_.Exception.Message
+        }
+
+        $errorMessage | Should Match 'Missing required CSV column'
+    }
+
+    It 'filters only third-party rows with title id and available status' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-filter.csv'
+        @(
+            [pscustomobject]@{ Name = 'ThirdPartyAvailable'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+            [pscustomobject]@{ Name = 'ThirdPartyBlocked'; Status = 'Blocked'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_2' }
+            [pscustomobject]@{ Name = 'MicrosoftAvailable'; Status = 'Available'; 'Publisher Type' = 'Microsoft'; 'Title ID' = 'P_3' }
+            [pscustomobject]@{ Name = 'ThirdPartyNoId'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = '' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{ displayName = 'ThirdPartyAvailable'; type = 'thirdParty'; isBlocked = $false }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            $null
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'POST' }
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result.Count | Should Be 1
+        $result[0].Name | Should Be 'ThirdPartyAvailable'
+    }
+
+    It 'skips packages already blocked in Graph' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-blocked.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{ displayName = 'Agent A'; type = 'thirdParty'; isBlocked = $true }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'AlreadyBlocked'
+    }
+
+    It 'returns graph lookup failure when package verification fails' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-lookup.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            throw '404 not found'
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'GraphLookupFailed'
+    }
+
+    It 'returns blocked when block action succeeds' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-success.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{ displayName = 'Agent A'; type = 'thirdParty'; isBlocked = $false }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            $null
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'POST' }
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'Blocked'
+    }
+
+    It 'returns failed when block action errors' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-failed.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{ displayName = 'Agent A'; type = 'thirdParty'; isBlocked = $false }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            throw '500 server error'
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'POST' }
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'Failed'
+    }
+}
+
+Describe 'Block-ToolkitThirdPartyAgent Graph type compatibility' {
+    It 'accepts external as a valid third-party type' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-external.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{ displayName = 'Agent A'; type = 'external'; isBlocked = $false }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            $null
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'POST' }
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'Blocked'
+    }
+
+    It 'skips unsupported Graph types' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\agents-unsupported.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{ displayName = 'Agent A'; type = 'microsoft'; isBlocked = $false }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        $result = Block-ToolkitThirdPartyAgent -CsvPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'SkippedNotExternal'
+    }
+}
+
+Describe 'Block-ThirdPartyAgentsFromAdminExport wrapper' {
+    It 'invokes the module cmdlet with the expected parameters' {
+        $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath '..\scripts\Block-ThirdPartyAgentsFromAdminExport.ps1'
+        $csvPath = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\wrapper-agents.csv'
+        @(
+            [pscustomobject]@{ Name = 'Agent A'; Status = 'Available'; 'Publisher Type' = 'ThirdParty'; 'Title ID' = 'P_1' }
+        ) | Export-Csv -LiteralPath $csvPath -NoTypeInformation -Encoding UTF8
+
+        Mock Block-ToolkitThirdPartyAgent {
+            @([pscustomobject]@{ Name = 'Agent A'; Result = 'WhatIf' })
+        }
+
+        & $scriptPath -CsvPath $csvPath -OutputPath (Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\wrapper-out.csv') -VerifyWithGraph:$false -WhatIf | Out-Null
+
+        Assert-MockCalled Block-ToolkitThirdPartyAgent -Times 1 -Exactly
     }
 }
