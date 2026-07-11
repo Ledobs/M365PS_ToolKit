@@ -61,7 +61,9 @@ Describe 'Module surface' {
     It 'exports reporting functions' {
         $names = (Get-Command -Module Ledobs.M365PS.ToolKit).Name
         ($names -contains 'Block-ToolkitThirdPartyAgent') | Should Be $true
+        ($names -contains 'Block-ToolkitNonMicrosoftTool') | Should Be $true
         ($names -contains 'Get-ToolkitDirectoryAudit') | Should Be $true
+        ($names -contains 'Get-ToolkitCopilotToolInventory') | Should Be $true
         ($names -contains 'Get-ToolkitSignIn') | Should Be $true
         ($names -contains 'Export-ToolkitReport') | Should Be $true
         ($names -contains 'New-AuditReport') | Should Be $true
@@ -260,6 +262,216 @@ Describe 'Block-ToolkitThirdPartyAgent Graph type compatibility' {
     }
 }
 
+Describe 'Get-ToolkitCopilotToolInventory' {
+    It 'returns a paged inventory and flags non-Microsoft publishers as candidates' {
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            if ($Uri -like '*page=2*') {
+                @{
+                    value = @(
+                        [pscustomobject]@{
+                            id                   = 'P_2'
+                            displayName          = 'Contoso Tool'
+                            publisher            = 'Contoso'
+                            type                 = 'external'
+                            elementTypes         = @('officeAddIn')
+                            supportedHosts       = @('Outlook')
+                            platform             = 'web'
+                            isBlocked            = $false
+                            lastModifiedDateTime = '2026-07-10T00:00:00Z'
+                        }
+                    )
+                }
+            }
+            else {
+                @{
+                    value = @(
+                        [pscustomobject]@{
+                            id                   = 'P_1'
+                            displayName          = 'Microsoft Tool'
+                            publisher            = 'Microsoft Corporation'
+                            type                 = 'external'
+                            elementTypes         = @('officeAddIn')
+                            supportedHosts       = @('Outlook')
+                            platform             = 'web'
+                            isBlocked            = $false
+                            lastModifiedDateTime = '2026-07-09T00:00:00Z'
+                        }
+                    )
+                    '@odata.nextLink' = 'https://graph.microsoft.com/v1.0/copilot/admin/catalog/packages?page=2'
+                }
+            }
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'GET' }
+
+        $result = Get-ToolkitCopilotToolInventory -SkipGraphConnect
+
+        $result.Count | Should Be 2
+        ($result | Where-Object Name -eq 'Microsoft Tool').BlockCandidate | Should Be $false
+        ($result | Where-Object Name -eq 'Contoso Tool').BlockCandidate | Should Be $true
+    }
+}
+
+Describe 'Block-ToolkitNonMicrosoftTool' {
+    It 'skips allowed Microsoft publishers from an inventory CSV' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-microsoft.csv'
+        @(
+            [pscustomobject]@{
+                Name                 = 'Microsoft Tool'
+                PackageId            = 'P_1'
+                Publisher            = 'Microsoft Corporation'
+                GraphType            = 'external'
+                ElementTypes         = 'officeAddIn'
+                SupportedHosts       = 'Outlook'
+                Platform             = 'web'
+                IsBlocked            = 'False'
+                LastModifiedDateTime = '2026-07-10T00:00:00Z'
+                BlockCandidate       = 'False'
+                BlockReason          = 'Allowed publisher.'
+            }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        $result = Block-ToolkitNonMicrosoftTool -InventoryPath $path -VerifyWithGraph:$false -Confirm:$false
+
+        $result[0].Result | Should Be 'SkippedAllowedPublisher'
+    }
+
+    It 'returns already blocked when Graph confirms the package is blocked' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-blocked.csv'
+        @(
+            [pscustomobject]@{
+                Name                 = 'Contoso Tool'
+                PackageId            = 'P_1'
+                Publisher            = 'Contoso'
+                GraphType            = 'external'
+                ElementTypes         = 'officeAddIn'
+                SupportedHosts       = 'Outlook'
+                Platform             = 'web'
+                IsBlocked            = 'False'
+                LastModifiedDateTime = '2026-07-10T00:00:00Z'
+                BlockCandidate       = 'True'
+                BlockReason          = 'Non-Microsoft publisher.'
+            }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{
+                id           = 'P_1'
+                displayName  = 'Contoso Tool'
+                publisher    = 'Contoso'
+                type         = 'external'
+                elementTypes = @('officeAddIn')
+                isBlocked    = $true
+            }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        $result = Block-ToolkitNonMicrosoftTool -InventoryPath $path -SkipGraphConnect -Confirm:$false -IncludeAlreadyBlocked
+
+        $result[0].Result | Should Be 'AlreadyBlocked'
+    }
+
+    It 'returns blocked when a non-Microsoft tool is blocked successfully' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-success.csv'
+        @(
+            [pscustomobject]@{
+                Name                 = 'Contoso Tool'
+                PackageId            = 'P_1'
+                Publisher            = 'Contoso'
+                GraphType            = 'external'
+                ElementTypes         = 'officeAddIn'
+                SupportedHosts       = 'Outlook'
+                Platform             = 'web'
+                IsBlocked            = 'False'
+                LastModifiedDateTime = '2026-07-10T00:00:00Z'
+                BlockCandidate       = 'True'
+                BlockReason          = 'Non-Microsoft publisher.'
+            }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{
+                id           = 'P_1'
+                displayName  = 'Contoso Tool'
+                publisher    = 'Contoso'
+                type         = 'external'
+                elementTypes = @('officeAddIn')
+                isBlocked    = $false
+            }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            $null
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'POST' }
+
+        $result = Block-ToolkitNonMicrosoftTool -InventoryPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'Blocked'
+    }
+
+    It 'returns graph lookup failure when package verification fails' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-lookup.csv'
+        @(
+            [pscustomobject]@{
+                Name                 = 'Contoso Tool'
+                PackageId            = 'P_1'
+                Publisher            = 'Contoso'
+                GraphType            = 'external'
+                ElementTypes         = 'officeAddIn'
+                SupportedHosts       = 'Outlook'
+                Platform             = 'web'
+                IsBlocked            = 'False'
+                LastModifiedDateTime = '2026-07-10T00:00:00Z'
+                BlockCandidate       = 'True'
+                BlockReason          = 'Non-Microsoft publisher.'
+            }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            throw '424 failed dependency'
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        $result = Block-ToolkitNonMicrosoftTool -InventoryPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'GraphLookupFailed'
+    }
+
+    It 'returns failed when the block action errors' {
+        $path = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-failed.csv'
+        @(
+            [pscustomobject]@{
+                Name                 = 'Contoso Tool'
+                PackageId            = 'P_1'
+                Publisher            = 'Contoso'
+                GraphType            = 'external'
+                ElementTypes         = 'officeAddIn'
+                SupportedHosts       = 'Outlook'
+                Platform             = 'web'
+                IsBlocked            = 'False'
+                LastModifiedDateTime = '2026-07-10T00:00:00Z'
+                BlockCandidate       = 'True'
+                BlockReason          = 'Non-Microsoft publisher.'
+            }
+        ) | Export-Csv -LiteralPath $path -NoTypeInformation -Encoding UTF8
+
+        Mock Get-ToolkitCopilotPackage {
+            [pscustomobject]@{
+                id           = 'P_1'
+                displayName  = 'Contoso Tool'
+                publisher    = 'Contoso'
+                type         = 'external'
+                elementTypes = @('officeAddIn')
+                isBlocked    = $false
+            }
+        } -ModuleName Ledobs.M365PS.ToolKit
+
+        Mock Invoke-ToolkitGraphRequestWithRetry {
+            throw '500 server error'
+        } -ModuleName Ledobs.M365PS.ToolKit -ParameterFilter { $Method -eq 'POST' }
+
+        $result = Block-ToolkitNonMicrosoftTool -InventoryPath $path -SkipGraphConnect -Confirm:$false
+
+        $result[0].Result | Should Be 'Failed'
+    }
+}
+
 Describe 'Block-ThirdPartyAgentsFromAdminExport wrapper' {
     It 'invokes the module cmdlet with the expected parameters' {
         $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath '..\scripts\Block-ThirdPartyAgentsFromAdminExport.ps1'
@@ -275,5 +487,47 @@ Describe 'Block-ThirdPartyAgentsFromAdminExport wrapper' {
         & $scriptPath -CsvPath $csvPath -OutputPath (Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\wrapper-out.csv') -VerifyWithGraph:$false -WhatIf | Out-Null
 
         Assert-MockCalled Block-ToolkitThirdPartyAgent -Times 1 -Exactly
+    }
+}
+
+Describe 'Block-NonMicrosoftTools wrapper' {
+    It 'invokes the inventory cmdlet when InventoryOnly is used' {
+        $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath '..\scripts\Block-NonMicrosoftTools.ps1'
+
+        Mock Get-ToolkitCopilotToolInventory {
+            @([pscustomobject]@{ Name = 'Contoso Tool'; BlockCandidate = $true })
+        }
+
+        & $scriptPath -InventoryOnly -InventoryOutputPath (Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-inventory.csv') | Out-Null
+
+        Assert-MockCalled Get-ToolkitCopilotToolInventory -Times 1 -Exactly
+    }
+
+    It 'invokes the blocking cmdlet with the expected parameters' {
+        $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath '..\scripts\Block-NonMicrosoftTools.ps1'
+        $inventoryPath = Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-wrapper.csv'
+        @(
+            [pscustomobject]@{
+                Name                 = 'Contoso Tool'
+                PackageId            = 'P_1'
+                Publisher            = 'Contoso'
+                GraphType            = 'external'
+                ElementTypes         = 'officeAddIn'
+                SupportedHosts       = 'Outlook'
+                Platform             = 'web'
+                IsBlocked            = 'False'
+                LastModifiedDateTime = '2026-07-10T00:00:00Z'
+                BlockCandidate       = 'True'
+                BlockReason          = 'Non-Microsoft publisher.'
+            }
+        ) | Export-Csv -LiteralPath $inventoryPath -NoTypeInformation -Encoding UTF8
+
+        Mock Block-ToolkitNonMicrosoftTool {
+            @([pscustomobject]@{ Name = 'Contoso Tool'; Result = 'WhatIf' })
+        }
+
+        & $scriptPath -InventoryPath $inventoryPath -OutputPath (Join-Path -Path $PSScriptRoot -ChildPath 'artifacts\tools-wrapper-out.csv') -WhatIf | Out-Null
+
+        Assert-MockCalled Block-ToolkitNonMicrosoftTool -Times 1 -Exactly
     }
 }

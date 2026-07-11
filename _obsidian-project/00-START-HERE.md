@@ -58,12 +58,16 @@ Ne pas supposer que ces changements viennent de la session courante.
 - Un CSV de reprise ciblé a été préparé: `C:\Users\FrançoisBreton\Downloads\Agents_2026-07-10_20_01_52_retry-no-hubspot.csv`.
 - Confirmation finale utilisateur: la reprise a abouti, les agents restants sont maintenant bloqués.
 - Le script de blocage des agents tiers est validé en conditions réelles.
+- Ajout d'une deuxième tranche toolkit pour les outils non-Microsoft visibles dans `Agents > Outils`.
+- Nouvelles cmdlets: `Get-ToolkitCopilotToolInventory` et `Block-ToolkitNonMicrosoftTool`.
+- Ajout du wrapper `scripts/Block-NonMicrosoftTools.ps1`.
+- Validation locale complète après ajout: manifeste OK, import OK, Pester OK (`Passed: 24`).
 
 ## Prochain pas exact
 
-1. Committer et pousser les changements du toolkit et de la mémoire Obsidian.
-2. Au prochain chantier, reprendre depuis `03-BACKLOG.md`.
-3. Garder le script actuel comme base validée pour les futures opérations agents.
+1. Valider manuellement l'inventaire Graph des outils sur le tenant réel avec `Get-ToolkitCopilotToolInventory`.
+2. Confirmer quelles valeurs `elementTypes` remontent réellement pour les MCP servers et plug-ins.
+3. Lancer ensuite un premier `WhatIf` de `Block-ToolkitNonMicrosoftTool` sur un petit sous-ensemble.
 
 ## Contexte à charger
 

@@ -19,7 +19,10 @@ Objectif: retrouver vite les fichiers importants sans relire le dépôt au compl
 - `src/Ledobs.M365PS.ToolKit/Private/`: helpers internes.
 - `src/Ledobs.M365PS.ToolKit/Public/New-AuditReport.ps1`: rapport combiné `signIns` + `directoryAudits`.
 - `src/Ledobs.M365PS.ToolKit/Public/Block-ToolkitThirdPartyAgent.ps1`: moteur de blocage des agents tiers depuis CSV.
+- `src/Ledobs.M365PS.ToolKit/Public/Get-ToolkitCopilotToolInventory.ps1`: inventaire Graph des outils Copilot du tenant.
+- `src/Ledobs.M365PS.ToolKit/Public/Block-ToolkitNonMicrosoftTool.ps1`: moteur de blocage des outils non-Microsoft depuis l'inventaire Graph.
 - `scripts/Block-ThirdPartyAgentsFromAdminExport.ps1`: wrapper admin pour exécuter le blocage.
+- `scripts/Block-NonMicrosoftTools.ps1`: wrapper admin pour inventorier ou bloquer les outils non-Microsoft.
 - `tests/`: tests Pester du module, à conserver versionnés.
 - `C:\Users\FrançoisBreton\Downloads\Agents_test_block_3.csv`: mini CSV de test préparé pour la validation réelle.
 - `C:\Users\FrançoisBreton\Downloads\Agents_2026-07-10_15_00_45.csv`: CSV complet à traiter pour le lot réel.
@@ -43,6 +46,8 @@ Import-Module .\src\Ledobs.M365PS.ToolKit\Ledobs.M365PS.ToolKit.psd1 -Force
 Test-ModuleManifest .\src\Ledobs.M365PS.ToolKit\Ledobs.M365PS.ToolKit.psd1
 Invoke-Pester -Path .\tests\Ledobs.M365PS.ToolKit.Tests.ps1
 .\scripts\Block-ThirdPartyAgentsFromAdminExport.ps1 -CsvPath <csv> -OutputPath <csv> -WhatIf
+.\\scripts\\Block-NonMicrosoftTools.ps1 -InventoryOnly -InventoryOutputPath <csv>
+.\\scripts\\Block-NonMicrosoftTools.ps1 -InventoryPath <csv> -OutputPath <csv> -WhatIf
 Connect-ToolkitAuth -Scopes 'CopilotPackages.ReadWrite.All'
 ```
 
@@ -84,3 +89,4 @@ Ces changements doivent être examinés séparément; ils ne font pas partie de 
 - Le lot sans HubSpot a réellement bloqué `81` packages.
 - Les `27` agents encore visibles se répartissent en `1` exclusion volontaire (`HubSpot`) et `26` échecs Graph avec `FailedDependency`.
 - L'utilisateur a confirmé ensuite que la reprise a abouti et que les agents restants sont maintenant bloqués.
+- Nouvelle tranche locale validée: inventaire paginé et blocage des outils non-Microsoft, avec suite Pester à `Passed: 24`.

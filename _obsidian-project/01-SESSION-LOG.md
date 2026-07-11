@@ -384,3 +384,60 @@ Prochain pas exact:
 
 - Committer et pousser les changements du repo.
 - Reprendre le prochain chantier depuis `03-BACKLOG.md`.
+
+## 2026-07-10 - Ajout du blocage des outils non-Microsoft
+
+État atteint:
+
+- Le toolkit gère maintenant l'inventaire Graph des outils Copilot et leur blocage en lot par éditeur.
+- La solution suit le même pattern que les agents tiers: cmdlet module + wrapper admin.
+- La validation locale est complète et verte.
+
+Delta depuis la session précédente:
+
+- Ajout de `Get-ToolkitCopilotToolInventory`.
+- Ajout de `Block-ToolkitNonMicrosoftTool`.
+- Ajout de helpers privés pour la connexion au catalogue packages, la pagination Graph, la normalisation de l'inventaire et la normalisation des résultats de blocage.
+- Ajout du wrapper `scripts/Block-NonMicrosoftTools.ps1`.
+- Mise à jour du README avec la nouvelle section d'usage.
+- La suite Pester est passée de `24` tests validés après extension.
+
+Décisions:
+
+- Garder Microsoft Graph comme moteur principal pour les outils.
+- Traiter l'Agent 365 CLI comme source de contrôle croisé facultative, pas comme moteur de blocage.
+- Politique par défaut v1: tout éditeur non `Microsoft Corporation` est candidat au blocage.
+
+Fichiers modifiés:
+
+- `README.md`
+- `src/Ledobs.M365PS.ToolKit/Ledobs.M365PS.ToolKit.psd1`
+- `src/Ledobs.M365PS.ToolKit/Public/Get-ToolkitCopilotToolInventory.ps1`
+- `src/Ledobs.M365PS.ToolKit/Public/Block-ToolkitNonMicrosoftTool.ps1`
+- `src/Ledobs.M365PS.ToolKit/Private/Connect-ToolkitCopilotPackageCatalog.ps1`
+- `src/Ledobs.M365PS.ToolKit/Private/Convert-ToolkitDelimitedStringToArray.ps1`
+- `src/Ledobs.M365PS.ToolKit/Private/Get-ToolkitCopilotPackages.ps1`
+- `src/Ledobs.M365PS.ToolKit/Private/New-ToolkitCopilotToolInventoryResult.ps1`
+- `src/Ledobs.M365PS.ToolKit/Private/New-ToolkitCopilotToolBlockResult.ps1`
+- `scripts/Block-NonMicrosoftTools.ps1`
+- `tests/Ledobs.M365PS.ToolKit.Tests.ps1`
+- `_obsidian-project/00-START-HERE.md`
+- `_obsidian-project/01-SESSION-LOG.md`
+- `_obsidian-project/02-DECISIONS.md`
+- `_obsidian-project/03-BACKLOG.md`
+- `_obsidian-project/04-CONTEXT-MAP.md`
+
+Tests/validations:
+
+- `Test-ModuleManifest .\src\Ledobs.M365PS.ToolKit\Ledobs.M365PS.ToolKit.psd1`
+- `Import-Module .\src\Ledobs.M365PS.ToolKit\Ledobs.M365PS.ToolKit.psd1 -Force`
+- `Invoke-Pester -Path .\tests\Ledobs.M365PS.ToolKit.Tests.ps1`
+- Résultat Pester: `Passed: 24 Failed: 0`
+
+Prochain pas exact:
+
+- Dans un shell PowerShell 7 connecté à Graph, lancer:
+  - `Get-ToolkitCopilotToolInventory -OutputPath '.\out\tools-inventory.csv'`
+- Vérifier les valeurs réelles `Publisher`, `ElementTypes`, `SupportedHosts` et `Platform`.
+- Lancer ensuite:
+  - `Block-ToolkitNonMicrosoftTool -InventoryPath '.\out\tools-inventory.csv' -OutputPath '.\out\block-non-microsoft-tools.csv' -WhatIf`

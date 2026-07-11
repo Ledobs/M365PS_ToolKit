@@ -12,6 +12,8 @@ Priorités indicatives. Garder les items actionnables et déplacer les détails 
 ## P1 - Toolkit PowerShell
 
 - Étendre le toolkit avec d'autres opérations agents si besoin: déblocage, rapports de synthèse, relances ciblées.
+- Valider sur tenant réel `Get-ToolkitCopilotToolInventory` et `Block-ToolkitNonMicrosoftTool`.
+- Ajuster la qualification des outils si le tenant révèle des `elementTypes` ou catégories inattendues.
 
 ## P2 - Reporting et gouvernance
 
@@ -32,3 +34,4 @@ Priorités indicatives. Garder les items actionnables et déplacer les détails 
 - 2026-07-10: Implémenter la v1 du blocage des agents tiers depuis CSV avec wrapper admin et tests.
 - 2026-07-10: Corriger `Block-ToolkitThirdPartyAgent` pour accepter `GraphType = thirdParty` et `external`.
 - 2026-07-10: Valider en conditions réelles la campagne de blocage des agents tiers via CSV admin + Graph.
+- 2026-07-10: Implémenter la v1 Graph-first du blocage des outils non-Microsoft avec cmdlets, wrapper et tests.

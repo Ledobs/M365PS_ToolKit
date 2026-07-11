@@ -12,9 +12,11 @@ Voir : `plan-m365AdminToolkit.prompt.md`
 
 ## Fonctions disponibles
 
+- `Block-ToolkitNonMicrosoftTool` : blocage en lot des outils non-Microsoft depuis l’inventaire Graph.
 - `Block-ToolkitThirdPartyAgent` : blocage des agents tiers depuis un CSV exporté du centre d'administration M365.
 - `Connect-ToolkitAuth` : connexion Microsoft Graph en interactif ou app-only.
 - `Export-ToolkitReport` : export CSV ou JSON des jeux de données collectés.
+- `Get-ToolkitCopilotToolInventory` : inventaire Graph des outils Copilot disponibles dans le tenant.
 - `Get-ToolkitDirectoryAudit` : lecture des événements `directoryAudits` Microsoft Entra ID.
 - `Assert-RequiredScopes` : validation des scopes Graph attendus.
 - `Get-ToolkitConfig` : chargement de la configuration toolkit.
@@ -142,6 +144,100 @@ Exemple via script wrapper :
   -OutputPath '.\out\third-party-block-results.csv' `
   -WhatIf
 ```
+
+## Gestion des outils non-Microsoft
+
+Prérequis :
+- PowerShell 7+
+- module `Microsoft.Graph.Authentication`
+- permission Microsoft Graph `CopilotPackages.ReadWrite.All` pour le blocage
+- accès au Package Management API Microsoft Agent 365
+
+Limites connues :
+- la vue **Agents > Outils** est gérée ici avec une approche Graph-first
+- l’action de blocage utilise un endpoint `/beta`
+- certains éléments de la vue admin peuvent ne pas remonter exactement comme attendu dans `copilot/admin/catalog/packages` selon l’état du service preview
+
+Exemple d’inventaire :
+
+```powershell
+Connect-ToolkitAuth -Scopes 'CopilotPackages.Read.All'
+
+Get-ToolkitCopilotToolInventory `
+  -OutputPath '.\out\tools-inventory.csv'
+```
+
+Exemple `WhatIf` de blocage des outils non-Microsoft :
+
+```powershell
+Connect-ToolkitAuth -Scopes 'CopilotPackages.ReadWrite.All'
+
+Block-ToolkitNonMicrosoftTool `
+  -InventoryPath '.\out\tools-inventory.csv' `
+  -OutputPath '.\out\block-non-microsoft-tools.csv' `
+  -WhatIf
+```
+
+Comportement opérationnel de `Block-ToolkitNonMicrosoftTool` :
+- la cmdlet lit `tools-inventory.csv` via `-InventoryPath`, ou génère un inventaire Graph si aucun inventaire n'est fourni
+- avec la politique par défaut, tout package dont `Publisher` n'est pas `Microsoft Corporation` est candidat au blocage
+- avec `-WhatIf`, aucun outil n'est réellement bloqué ; le rapport indique seulement ce qui serait tenté
+- sans `-WhatIf`, la cmdlet tente de bloquer tous les éléments éligibles du CSV fourni
+- il n'existe pas encore d'approbation interactive ligne par ligne dans la cmdlet
+- pour bloquer seulement certains outils non-Microsoft, il faut préparer un CSV approuvé contenant uniquement les lignes souhaitées
+
+En pratique :
+1. générer `tools-inventory.csv`
+2. relire le CSV
+3. créer une copie approuvée, par exemple `tools-inventory-approved.csv`
+4. lancer `Block-ToolkitNonMicrosoftTool` sur ce CSV en `-WhatIf`
+5. lancer ensuite l'exécution réelle sans `-WhatIf`
+
+Exemple recommandé :
+
+```powershell
+Get-ToolkitCopilotToolInventory -OutputPath '.\out\tools-inventory.csv'
+```
+
+Puis :
+
+```powershell
+Block-ToolkitNonMicrosoftTool `
+  -InventoryPath '.\out\tools-inventory-approved.csv' `
+  -OutputPath '.\out\block-non-microsoft-tools.csv' `
+  -WhatIf
+```
+
+Puis la même commande sans `-WhatIf`.
+
+Exemple d’exécution réelle :
+
+```powershell
+Connect-ToolkitAuth -Scopes 'CopilotPackages.ReadWrite.All'
+
+Block-ToolkitNonMicrosoftTool `
+  -InventoryPath '.\out\tools-inventory.csv' `
+  -OutputPath '.\out\block-non-microsoft-tools.csv'
+```
+
+Exemple via wrapper :
+
+```powershell
+.\scripts\Block-NonMicrosoftTools.ps1 `
+  -InventoryOnly `
+  -InventoryOutputPath '.\out\tools-inventory.csv'
+
+.\scripts\Block-NonMicrosoftTools.ps1 `
+  -InventoryPath '.\out\tools-inventory.csv' `
+  -OutputPath '.\out\block-non-microsoft-tools.csv' `
+  -WhatIf
+```
+
+Limites v1 :
+- pas d'approbation interactive ligne par ligne
+- pas encore de filtrage natif par `Name`, `PackageId` ou liste explicite d'IDs
+- la sélection ciblée repose sur la préparation manuelle d'un CSV d'inventaire réduit
+- `PublisherAllowList` et `ElementTypeAllowList` restent des garde-fous complémentaires, pas un mécanisme d'approbation métier
 
 Inspiration:
 - https://github.com/microsoft/Microsoft365DSC

@@ -153,3 +153,22 @@ Conséquence:
 - La logique de filtrage Graph de `Block-ToolkitThirdPartyAgent` doit accepter les 2 valeurs.
 - Les tests doivent couvrir explicitement `thirdParty`, `external` et un type hors périmètre.
 - Les plans et validations suivants doivent s'appuyer sur cette réalité observée, pas sur l'hypothèse initiale `external` seule.
+
+## 2026-07-10 - Les outils non-Microsoft sont gérés en Graph-first
+
+Contexte:
+
+- La vue `Agents > Outils` ne fournit pas d'export CSV exploitable comme la vue des agents.
+- Le toolkit dispose déjà d'un moteur Graph robuste pour inventorier et bloquer des packages Copilot.
+- La documentation Microsoft expose les packages Copilot avec `publisher`, `isBlocked`, `elementTypes` et l'action `block`.
+
+Décision:
+
+- Implémenter l'inventaire et le blocage des outils non-Microsoft à partir de `GET /copilot/admin/catalog/packages`.
+- Garder l'Agent 365 CLI comme source de comparaison facultative seulement.
+- Prendre `Microsoft Corporation` comme unique éditeur autorisé par défaut en v1.
+
+Conséquence:
+
+- Les futures validations doivent confirmer quelles catégories réelles de packages de la vue Outils remontent dans le catalogue Graph.
+- Le blocage en lot des outils repose sur un inventaire Graph revu avant exécution réelle.
